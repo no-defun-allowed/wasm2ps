@@ -1,0 +1,94 @@
+%!PS-Adobe-2.0
+%%Creator: wasm2ps
+%% Control flow stuff
+
+% A label is either /return or a natural number.
+/next-label { dup type /integertype eq { 1 sub } if } bind def
+
+% body handler unwind-protect --
+%                                either values from body
+%                                    or values from handler
+/catch {
+    % Stash our handler somewhere.
+    2 dict begin
+    /unwind  exch def
+    /handler exch def
+    % We put end in a funny position ,so that this handler won't be
+    % bound while running the handler.
+    stopped
+    { dup 0 eq
+      { pop /handler load end exec }
+      { /unwind load end exec next-label throw }
+      ifelse }
+    { end }
+    ifelse
+} bind def
+/throw { stop } bind def
+
+% body local-count --
+/function-body {
+    dict begin
+    stopped { pop } if
+    end
+} bind def
+/return { /return throw } bind def
+
+/block { { } { } catch } bind def
+% Add a handler to restart the loop.
+/wasm-loop {
+    2 dict begin
+    /body exch def
+    /loop-done true def
+    {
+        /loop-done true store
+        { /body load exec } { /loop-done false store } { end } catch
+        /loop-done load { exit } if
+    } loop
+    end
+} bind def
+
+%% Conversions
+
+/int-to-string { 20 string cvs } def
+/boolean-to-int { { 1 } { 0 } ifelse } bind def
+
+%% Set up graphics reasonably.
+
+clippath pathbbox newpath
+/top exch def
+/right exch def
+/bottom exch def
+/left exch def
+
+/Courier findfont 32 scalefont setfont
+0 setgray
+left 30 add
+top 30 sub
+moveto
+
+
+%% Now, the program
+
+% (TYPE (FUNC (PARAM I32) (RESULT I32)))
+% (TYPE (FUNC (RESULT I32)))
+% (IMPORT env __linear_memory (MEMORY 0))
+% (IMPORT env __indirect_function_table (TABLE 0 FUNCREF))
+/$FIB { { 
+0 exch def
+3 0 def
+2 0 def
+1 0 def
+{ 0 load 2 ge boolean-to-int 0 ne { 0 throw } if 0 load return } block
+0 1 exch store
+{ 0 load -1 add $FIB 1 load add 1 exch store 0 load 3 gt boolean-to-int 2 exch store 0 load -2 add dup 3 exch store 0 exch store 2 load 0 ne { 0 throw } if } wasm-loop
+3 load 1 load add } 3 function-body } bind def
+/$PS_MAIN { { 
+
+25 $FIB } 0 function-body } bind def
+
+%% And run it
+
+%%Page: 1 1
+
+$PS_MAIN int-to-string show showpage
+%%EOF

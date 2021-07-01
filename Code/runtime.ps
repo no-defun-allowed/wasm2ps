@@ -1,0 +1,69 @@
+%!PS
+%%Creator: wasm2ps
+%% Control flow stuff
+
+% A label is either /return or a natural number.
+/next-label { dup type /integertype eq { 1 sub } if } bind def
+
+% body handler unwind-protect --
+%                                either values from body
+%                                    or values from handler
+/catch {
+    % Stash our handler somewhere.
+    2 dict begin
+    /unwind  exch def
+    /handler exch def
+    % We put end in a funny position ,so that this handler won't be
+    % bound while running the handler.
+    stopped
+    { dup 0 eq
+      { pop /handler load end exec }
+      { /unwind load end exec next-label throw }
+      ifelse }
+    { end }
+    ifelse
+} bind def
+/throw { stop } bind def
+
+% body local-count --
+/function-body {
+    dict begin
+    stopped { pop } if
+    end
+} bind def
+/return { /return throw } bind def
+
+/block { { } { } catch } bind def
+% Add a handler to restart the loop.
+/wasm-loop {
+    2 dict begin
+    /body exch def
+    /loop-done true def
+    {
+        /loop-done true store
+        { /body load exec } { /loop-done false store } { end } catch
+        /loop-done load { exit } if
+    } loop
+    end
+} bind def
+
+%% Conversions
+
+/int-to-string { 20 string cvs } bind def
+/boolean-to-int { { 1 } { 0 } ifelse } bind def
+
+%% Set up graphics reasonably.
+
+clippath pathbbox newpath
+/top exch def
+/right exch def
+/bottom exch def
+/left exch def
+
+/Courier findfont 32 scalefont setfont
+0 setgray
+left 30 add
+top 30 sub
+moveto
+
+%% Here comes the program...
